@@ -5,6 +5,7 @@
 %%%--------------------------------------------------------------------
 % General Types
 -type proplist()     :: [{term(), term()}].  % predefined in newer releases
+-type account_type() :: managed | standalone.
 -type amount()       :: pos_integer().  % any amount of money
 -type price()        :: 50..99999999.  % valid charge prices. $0.50 to $1M-0.01
 -type currency()     :: aed | % united arab emirates dirham
@@ -147,6 +148,7 @@
                         zar | % south african rand
                         zmw.  % zambian kwacha
 -type customer_id()  :: binary(). % cu_* | cus_*  (docs show both in use)
+-type account_id()  :: binary(). % acct_* 
 -type coupon_id()    :: binary(). % user specidied coupon ID
 -type plan_id()      :: binary(). % user specified plan ID
 -type charge_id()    :: binary(). % ch_*
@@ -165,10 +167,11 @@
 -type json()         :: tuple().
 -type country()      :: binary().
 -type epoch()        :: pos_integer().
+-type timezone()     :: binary() | string().
 -type check_result() :: pass | fail | unchecked.
 -type credit_provider() :: binary().
 -type stripe_object_name() :: charge | customer | invoice | invoiceitem |
-                              plan | token.
+                              plan | token | account.
 -type event_id() :: binary() | string().
 -type event_type() :: binary() | string().
 
@@ -194,6 +197,8 @@
 
 -type transfer_status() :: paid | pending | failed.
 
+-type key_value()       :: {desc(), desc()}.
+
 %%%--------------------------------------------------------------------
 %%% Error
 %%%--------------------------------------------------------------------
@@ -209,25 +214,43 @@
 %%%--------------------------------------------------------------------
 %%% Records / Stripe Objects
 %%%--------------------------------------------------------------------
--record(stripe_card, {name       :: name(),
+-record(stripe_card, {id         :: binary(),
+                      name       :: name(),
                       last4      :: binary(),
+                      funding    :: binary(), 
                       exp_year   :: 2011..3000,
                       exp_month  :: 1..12,
                       brand      :: credit_provider(),
+                      address_line1 :: null | binary(),
+                      address_line2 :: null | binary(),
+                      address_city  :: null | binary(),
+                      address_zip   :: null | binary(), 
+                      address_country :: null | binary(),
                       cvc_check  :: check_result(),
                       address_line1_check :: check_result(),
                       address_zip_check   :: check_result(),
-                      country    :: country()
+                      tokenization  :: null | binary(),
+                      dynamic_last4 :: null | binary(),
+                      country    :: country(),
+                      fingerprint :: binary() | string() | null, 
+                      recipient :: recipient_id(),
+                      customer :: customer_id(),
+                      account :: account_id(),
+                      currency :: currency(),
+                      default_for_currency :: boolean()
                      }).
 
--record(stripe_bank_account, {fingerprint :: fingerprint(),
+-record(stripe_bank_account, {id          :: binary(),
+                              currency    :: currency(),
+                              default_for_currency :: boolean(),
+                              metadata    :: [key_value()],
+                              fingerprint :: fingerprint(),
                               bank_name   :: bank_name(),
                               last4       :: last4(),
                               country     :: country(),
-                              validated   :: boolean(),
-                              description :: desc(),
-                              recipient   :: recipient_id(),
-                              statement_descriptor :: desc()}).
+                              status      :: new | validated | verified | errored,
+                              routing_number :: binary(), 
+                              account     :: binary()}).
 
 -record(stripe_charge, {id          :: charge_id(),
                         created     :: epoch(),
@@ -299,8 +322,77 @@
                           email           :: email(),
                           delinquent      :: boolean(),
                           discount        :: #stripe_discount{},
-                          account_balance :: amount()
+                          account_balance :: amount(),
+                          sources          :: [#stripe_bank_account{} | #stripe_card{}]
                          }).
+
+-record(stripe_verification, {fields_needed :: [desc()], 
+  disabled_reason :: 'rejected.fraud' | 'rejected.terms_of_service' | 
+    'rejected.listed' | 'rejected.other' | fields_needed | listed | other | null,
+  due_by          :: string() | binary() | null}).
+
+-record(stripe_transfer_schedule, {delay_days :: integer(),
+  interval        :: manual | daily | weekly | monthly,
+  monthly_anchor  :: pos_integer() | 0,
+  weekly_anchor   :: string()}).
+
+-record(stripe_decline_charge_on, {cvc_failure :: boolean(),
+  avs_failure :: boolean()}).
+
+-record(stripe_tos_acceptance, {ip :: string() | binary(),
+ date       :: epoch(), 
+ user_agent :: desc()}).  
+
+-record(address, {line1 :: string() | binary() | null,
+  line2         :: string() | binary() | null,
+  city          :: string() | binary() | null,
+  state         :: string() | binary() | null,
+  postal_code   :: string() | binary() | null,
+  country       :: string() | binary() | null}).
+
+-record(date, {day :: pos_integer(),
+  month :: pos_integer(),
+  year  :: pos_integer()}).
+
+-record(stripe_legal_entity_verification, {status :: unverified | pending | verified,
+  details   :: desc() | null,
+  document  :: desc() | null}).
+
+-record(stripe_legal_entity, {type :: corporation | individual, 
+  business_name           :: desc(),
+  address                 :: #address{},
+  first_name              :: desc(),
+  last_name               :: desc(),
+  personal_address        :: #address{},
+  dob                     :: #date{},
+  %additional_owners       :: [#owner{}],
+  verification            :: #stripe_legal_entity_verification{}}).
+
+-record(stripe_account, {id :: account_id(), 
+  email                     :: email(), 
+  statement_descriptor      :: desc(),
+  display_name              :: desc(),
+  timezone                  :: timezone(), 
+  details_submitted         :: boolean(),
+  charges_enabled           :: boolean(),
+  transfers_enabled         :: boolean(),
+  currencies_supported      :: [currency()],
+  default_currency          :: currency(),
+  country                   :: country(),
+  business_name             :: desc(),
+  business_url              :: desc(),
+  support_phone             :: desc(),
+  business_logo             :: binary() | null,
+  managed                   :: boolean(),
+  product_description       :: desc(),
+  debit_negative_balances   :: boolean(),
+  bank_accounts             :: [#stripe_bank_account{}], 
+  external_accounts         :: [#stripe_bank_account{}],
+  verification              :: #stripe_verification{},
+  transfer_schedule         :: #stripe_transfer_schedule{},
+  decline_charge_on         :: #stripe_decline_charge_on{},
+  tos_acceptance            :: #stripe_tos_acceptance{},
+  legal_entity              :: #stripe_legal_entity{}}).
 
 -record(stripe_event, {id      :: event_id(),
                        type    :: event_type(),

@@ -13,6 +13,10 @@ stripe_test_() ->
     fun setup/0,
     fun teardown/1,
     [
+     {"Create Immediate Managed Account",
+       fun create_managed_account_immediate/0},
+     {"Create a Charge into a Managed Account",
+       fun charge_for_managed_account/0},
      {"Create Immediate Credit Card Token",
        fun create_token_card_immediate/0},
      {"Create Credit Card Token",
@@ -55,6 +59,33 @@ stripe_test_() ->
 %%%----------------------------------------------------------------------
 %%% Tests
 %%%----------------------------------------------------------------------
+create_managed_account_immediate() ->
+  Result = ?debugTime("Creating immediate managed account",
+    stripe:account_create(managed, "US", "billythekid@wildwildwest.com")),
+  put(current_managed_account_immediate, Result#stripe_account.id),
+  ?debugFmt("Managed account ID: ~p~n", [Result#stripe_account.id]),
+  ?assertEqual(false, Result#stripe_account.details_submitted).
+
+charge_for_managed_account() ->
+  ?debugTime("Create a Charge into a Managed Account", []),
+  AccountId = get(current_managed_account_immediate),
+  BankToken = stripe:token_create_bank("US", "111000025", "000123456789"),
+  ?assertEqual(<<"Not Returned by API">>, BankToken#stripe_token.card),
+  _BankAccount = stripe:account_update_subresource(AccountId, <<"external_accounts">>, 
+    [{"external_account", BankToken#stripe_token.id}]),
+  create_customer(),
+  Account = stripe:account_get(AccountId),
+  ?debugFmt("Managed account: ~p~n", [Account]),
+  Customer = get(current_customer),
+  StripeCustomer = stripe:customer_get(Customer),
+  ?debugFmt("Customer: ~p~n", [StripeCustomer]),
+  [StripeCustomerFirstSource|_] = StripeCustomer#stripe_customer.sources,
+  Result = ?debugTime("Creating the managed account charge", 
+    stripe:managed_account_charge_customer(215, usd, Customer, 
+      AccountId, <<"Managed account test charge">>)),
+  ?debugFmt("Managed account charge ID: ~p, stripe source: ~p~n", 
+    [Result#stripe_charge.id, StripeCustomerFirstSource]).
+
 create_token_card_immediate() ->
   Result = ?debugTime("Creating immediate credit card token",
                       stripe:token_create("4000 0000 0000 0077", 12, 2021, 123,
