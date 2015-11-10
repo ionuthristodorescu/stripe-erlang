@@ -3,8 +3,8 @@
 -module(stripe).
 
 -export([token_create/10, token_create_bank/3]).
--export([customer_create/3, customer_get/1, customer_update/3]).
--export([account_create/3, account_update/2, account_update_subresource/3, account_get/1]).%, customer_get/1, customer_update/3]).
+-export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1]).
+-export([account_create/3, account_update/2, account_update_subresource/3, account_get/1, account_get_id/1]).%, customer_get/1, customer_update/3]).
 -export([managed_account_charge_customer/5]).
 -export([charge_customer/4, charge_card/4]).
 -export([subscription_update/3, subscription_update/5,
@@ -88,6 +88,10 @@ account_update_subresource(AcctId, Resource, Fields) ->
 account_get(AccountId) ->
   request_account(AccountId).
 
+-spec account_get_id(#stripe_account{}) -> account_id().
+account_get_id(StripeAccount) ->
+  StripeAccount#stripe_account.id.
+
 %%%--------------------------------------------------------------------
 %%% Customer Creation
 %%%--------------------------------------------------------------------
@@ -104,6 +108,10 @@ customer_create(Card, Email, Desc) ->
 -spec customer_get(customer_id()) -> result.
 customer_get(CustomerId) ->
   request_customer(CustomerId).
+
+-spec customer_get_id(#stripe_customer{}) -> customer_id().
+customer_get_id(StripeCustomer) ->
+  StripeCustomer#stripe_customer.id.
 
 %%%--------------------------------------------------------------------
 %%% Customer Updating
