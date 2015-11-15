@@ -302,6 +302,7 @@ setup() ->
   httpc:request("https://google.com"),
   application:start(stripe),
   application:set_env(stripe, auth_token, "sk_test_BQokikJOvBiI2HlWgH4olfQ2"),
+  application:set_env(stripe, public_key, "pk_test_1RTcHdJwXKrXVkecW6Mw31zr"),
   ok.
 
 teardown(_) ->

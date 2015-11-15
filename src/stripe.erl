@@ -2,7 +2,7 @@
 %% ex: ft=erlang ts=2 sw=2 et
 -module(stripe).
 
--export([token_create/10, token_create_bank/3]).
+-export([token_create/10, token_create_bank/3, token_get_id/1]).
 -export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1]).
 -export([account_create/3, account_update/2, account_update_subresource/3, account_get/1, account_get_id/1]).%, customer_get/1, customer_update/3]).
 -export([managed_account_charge_customer/5]).
@@ -144,6 +144,9 @@ token_create_bank(Country, RoutingNumber, AccountNumber) ->
             {"bank_account[routing_number]", RoutingNumber},
             {"bank_account[account_number]", AccountNumber}],
   request_token_create(Fields).
+
+token_get_id(Token) ->
+  Token#stripe_token.id.
 
 %%%--------------------------------------------------------------------
 %%% subscription updating/creation and removal
