@@ -2,40 +2,96 @@
 %% ex: ft=erlang ts=2 sw=2 et
 -module(stripe).
 
--export([token_create/10, token_create_bank/3]).
--export([customer_create/3, customer_get/1, customer_update/3]).
+-export([get_record_id/1]).
+-export([token_create/10, token_create_bank/3, token_get_id/1]).
+-export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1]).
+-export([account_create/3, account_update/2, account_update_subresource/3, account_get/1, account_get_id/1]).%, customer_get/1, customer_update/3]).
+-export([managed_account_charge_customer/5]).
 -export([charge_customer/4, charge_card/4]).
--export([subscription_update/3, subscription_update/5, subscription_update/6, subscription_cancel/2, subscription_cancel/3]).
+-export([subscription_update/3, subscription_update/5,
+         subscription_update/6, subscription_cancel/2, subscription_cancel/3]).
 -export([customer/1, event/1, invoiceitem/1]).
 -export([recipient_create/6, recipient_update/6]).
 -export([transfer_create/5, transfer_cancel/1]).
 -export([invoiceitem_create/4]).
+-export([gen_paginated_url/1, gen_paginated_url/2,
+         gen_paginated_url/3, gen_paginated_url/4]).
+-export([get_all_customers/0, get_num_customers/1]).
 
 -include("stripe.hrl").
 
--define(VSN_BIN, <<"0.7.0">>).
+-define(VSN_BIN, <<"0.8.0">>).
 -define(VSN_STR, binary_to_list(?VSN_BIN)).
 
+% Stripe limit for paginated requests, change
+% this number if stripe changes it in the future
+% See: https://stripe.com/docs/api#pagination
+-define(STRIPE_LIST_LIMIT, 100).
 %%%--------------------------------------------------------------------
 %%% Charging
 %%%--------------------------------------------------------------------
 -spec charge_customer(price(), currency(), customer_id(), desc()) -> result.
 charge_customer(Amount, Currency, Customer, Desc) ->
-  charge(Amount, Currency, {customer, Customer}, Desc).
+  charge(Amount, Currency, {customer, Customer}, {}, Desc).
+
+-spec managed_account_charge_customer(price(), currency(), customer_id(), account_id(), desc()) -> result.
+managed_account_charge_customer(Amount, Currency, CustomerSrc, AccountDest, Desc) ->
+  charge(Amount, Currency, {customer, CustomerSrc}, {destination, AccountDest}, Desc).
 
 -spec charge_card(price(), currency(), token_id(), desc()) -> result.
 charge_card(Amount, Currency, Card, Desc) ->
-  charge(Amount, Currency, {card, Card}, Desc).
+  charge(Amount, Currency, {card, Card}, {}, Desc).
 
 -spec charge(price(), currency(),
-            {customer, customer_id()} | {card, token_id()}, desc()) -> result.
-charge(Amount, Currency, CustomerOrCard, Desc) when
-    Amount > 50 andalso is_tuple(CustomerOrCard) ->
-  Fields = [{amount, Amount},
+            {customer, customer_id()} | {card, token_id()},
+            {} | {destination, account_id()}, desc()) -> result.
+charge(Amount, Currency, CustomerOrCard, Destination, Desc) when
+    Amount > 50 andalso is_tuple(CustomerOrCard) andalso is_tuple(Destination) ->
+  F = [{amount, Amount},
             {currency, Currency},
             CustomerOrCard,
             {description, Desc}],
+  Fields = if 
+    Destination == {} -> F;
+    true -> F ++ [Destination]
+  end,
   request_charge(Fields).
+
+%%%--------------------------------------------------------------------
+%%% Account Creation
+%%%--------------------------------------------------------------------
+-spec account_create(account_type(), country(), email()) -> result.
+account_create(AcctType, Country, Email) ->
+  DefaultFields = [{country, Country},
+            {email, Email}],
+  Fields = if 
+    AcctType == managed -> DefaultFields ++ [{managed, true}];
+    AcctType == standalone -> DefaultFields;
+    true -> io:format("Error in account create, acct_type = ~p", [AcctType])
+  end,
+  request_account_create(Fields).
+
+%%%--------------------------------------------------------------------
+%%% Account Updating
+%%%--------------------------------------------------------------------
+-spec account_update(account_id(), list()) -> result.
+account_update(AcctId, Fields) ->
+  request_account_update(AcctId, Fields).
+
+-spec account_update_subresource(account_id(), desc(), list()) -> result.
+account_update_subresource(AcctId, Resource, Fields) ->
+  request_account_update_subresource(AcctId, Resource, Fields). 
+
+%%%--------------------------------------------------------------------
+%%% Account Fetching
+%%%--------------------------------------------------------------------
+-spec account_get(account_id()) -> result.
+account_get(AccountId) ->
+  request_account(AccountId).
+
+-spec account_get_id(#stripe_account{}) -> account_id().
+account_get_id(StripeAccount) ->
+  StripeAccount#stripe_account.id.
 
 %%%--------------------------------------------------------------------
 %%% Customer Creation
@@ -53,6 +109,10 @@ customer_create(Card, Email, Desc) ->
 -spec customer_get(customer_id()) -> result.
 customer_get(CustomerId) ->
   request_customer(CustomerId).
+
+-spec customer_get_id(#stripe_customer{}) -> customer_id().
+customer_get_id(StripeCustomer) ->
+  StripeCustomer#stripe_customer.id.
 
 %%%--------------------------------------------------------------------
 %%% Customer Updating
@@ -85,6 +145,9 @@ token_create_bank(Country, RoutingNumber, AccountNumber) ->
             {"bank_account[routing_number]", RoutingNumber},
             {"bank_account[account_number]", AccountNumber}],
   request_token_create(Fields).
+
+token_get_id(Token) ->
+  Token#stripe_token.id.
 
 %%%--------------------------------------------------------------------
 %%% subscription updating/creation and removal
@@ -153,6 +216,10 @@ event(EventId) ->
 customer(CustomerId) ->
   request_customer(CustomerId).
 
+%%%--------------------------------------------------------------------
+%%% InvoiceItem Support
+%%%--------------------------------------------------------------------
+
 invoiceitem(InvoiceItemId) ->
   request_invoiceitem(InvoiceItemId).
 
@@ -162,6 +229,16 @@ invoiceitem_create(Customer, Amount, Currency, Description) ->
               {currency, Currency},
               {description, Description}],
     request_invoiceitem_create(Fields).
+
+%%%--------------------------------------------------------------------
+%%% Pagination Support
+%%%--------------------------------------------------------------------
+
+get_all_customers() ->
+    request_all_customers().
+
+get_num_customers(Count) ->
+    request_num_customers(Count).
 
 %%%--------------------------------------------------------------------
 %%% request generation and sending
@@ -180,6 +257,18 @@ request_invoiceitem(InvoiceItemId) ->
 
 request_invoiceitem_create(Fields) ->
   request(invoiceitems, post, Fields).
+
+request_account_create(Fields) ->
+  request(accounts, post, Fields).
+
+request_account_update(AccountId, Fields) ->
+  request_run(gen_account_url(AccountId), post, Fields).
+
+request_account_update_subresource(AccountId, Resource, Fields) ->
+  request_run(gen_account_subresource_url(AccountId, Resource), post, Fields).
+
+request_account(AccountId) ->
+  request_run(gen_account_url(AccountId), get, []).
 
 request_customer_create(Fields) ->
   request(customers, post, Fields).
@@ -224,6 +313,43 @@ request_subscription(unsubscribe, Customer, Subscription, Fields, _AtEnd = true)
 request_subscription(unsubscribe, Customer, Subscription,Fields, _AtEnd = false) ->
   request_run(gen_subscription_url(Customer, Subscription), delete, Fields).
 
+request_all_customers() ->
+  request_all(customers).
+
+request_num_customers(Count) when Count =< ?STRIPE_LIST_LIMIT ->
+  request_run(gen_paginated_url(customers, Count), get, []);
+request_num_customers(Count) ->
+  error_logger:error_msg("Requested ~p customers when ~p is the maximum allowed~n",
+                         [Count, ?STRIPE_LIST_LIMIT]).
+
+%% Request all items in a pagination supported type
+%% This will continue to call ?STRIPE_LIST_LIMIT items
+%% until no items are remaining. If attempting to test
+%% be sure to set large timeouts for listing huge accounts
+request_all(Type) ->
+  request_all(Type, []).
+request_all(Type, StartingAfter) ->
+  case request_run_all(gen_paginated_url(Type,
+                                         ?STRIPE_LIST_LIMIT,
+                                         StartingAfter)) of
+    {error, Reason} ->
+      {error, Reason};
+    {false, Results} ->
+      Results#stripe_list.data;
+    {true, Results} ->
+      TypeList = Results#stripe_list.data,
+      LastElement = lists:last(TypeList),
+      LastElementId = get_record_id(LastElement),
+      TypeList ++ request_all(Type, LastElementId)
+  end.
+
+get_record_id(Type) when is_record(Type, stripe_customer) ->
+  Type#stripe_customer.id;
+get_record_id(Type) when is_record(Type, stripe_account) ->
+  Type#stripe_account.id;
+get_record_id(Type) when is_record(Type, stripe_charge) ->
+  Type#stripe_charge.id.
+
 request_run(URL, Method, Fields) ->
   Headers = [{"X-Stripe-Client-User-Agent", ua_json()},
              {"User-Agent", "Stripe/v1 ErlangBindings/" ++ ?VSN_STR},
@@ -238,6 +364,31 @@ request_run(URL, Method, Fields) ->
             end,
   Requested = httpc:request(Method, Request, [], []),
   resolve(Requested).
+
+%% Much like request_run/3 except that a tuple is returned with the
+%% results indicating more results are available
+%% Returns:
+%%   {error, Reason} - Same as request_run
+%%   {false, Results} - No more results left, returns current page list
+%%   {true, Results} - There are more results left, returns current page list
+request_run_all(URL) ->
+  Headers = [{"X-Stripe-Client-User-Agent", ua_json()},
+             {"User-Agent", "Stripe/v1 ErlangBindings/" ++ ?VSN_STR},
+             {"Authorization", auth_key()}],
+  Request = {URL, Headers},
+  Requested = httpc:request(get, Request, [], []),
+
+  case resolve(Requested) of
+    {error, _} = Error ->
+      Error;
+    Results ->
+      {has_more(Requested), Results}
+  end.
+
+%% Simple function that checks if the body has more results in a paginated query
+has_more({ok, {{_HTTPVer, _StatusCode, _Reason}, _Headers, Body}}) ->
+  DecodedResult = mochijson2:decode(Body, [{format, proplist}]),
+  proplists:get_value(<<"has_more">>, DecodedResult).
 
 %%%--------------------------------------------------------------------
 %%% response parsing
@@ -267,26 +418,28 @@ resolve_status(HTTPStatus, ErrorBody) ->
                                   DecodedResult, ?NRAPI)).
 
 json_to_record(Json) when is_list(Json) andalso is_tuple(hd(Json)) ->
-  case proplists:get_value(<<"object">>, Json) of
-    <<"event">> -> json_to_event_record(Json);
-          Found -> json_to_record(Found, Json)
-  end;
+  json_to_record(proplists:get_value(<<"object">>, Json), Json);
+
 json_to_record(Body) when is_list(Body) orelse is_binary(Body) ->
   DecodedResult = mochijson2:decode(Body, [{format, proplist}]),
   json_to_record(DecodedResult).
 
-json_to_event_record(DecodedResult) ->
+% Yes, these are verbose and dumb because we don't have runtime record/object
+% capabilities.  In a way, it's nice being explicit up front.
+-spec json_to_record(stripe_object_name(), proplist()) -> #stripe_list{}.
+json_to_record(<<"list">>, DecodedResult) ->
+    Data = ?V(data),
+    #stripe_list{data = [json_to_record(Object) || Object <- Data]};
+
+json_to_record(<<"event">>, DecodedResult) ->
   Data = ?V(data),
   Object = proplists:get_value(<<"object">>, Data),
   ObjectName = proplists:get_value(<<"object">>, Object),
   #stripe_event{id      = ?V(id),
                 type    = ?V(type),
                 created = ?V(created),
-                data    = json_to_record(ObjectName, Object)}.
+                data    = json_to_record(ObjectName, Object)};
 
-% Yes, these are verbose and dumb because we don't have runtime record/object
-% capabilities.  In a way, it's nice being explicit up front.
--spec json_to_record(stripe_object_name(), proplist()) -> record().
 json_to_record(<<"charge">>, DecodedResult) ->
   #stripe_charge{id           = ?V(id),
                  created      = ?V(created),
@@ -317,7 +470,8 @@ json_to_record(<<"customer">>, DecodedResult) ->
                    email           = ?V(email),
                    delinquent      = ?V(delinquent),
                    discount        = json_to_record(<<"discount">>, ?V(discount)),
-                   account_balance = ?V(account_balance)};
+                   account_balance = ?V(account_balance),
+                   sources         = proplist_to_customer_sources(?V(sources))};
 
 % We don't have eunit tests for discount decoding yet.  Use at your own risk.
 json_to_record(<<"discount">>, null) -> null;
@@ -388,23 +542,131 @@ json_to_record(<<"transfer">>, DecodedResult) ->
                    recipient    = ?V(recipient),
                    statement_descriptor = ?V(statement_descriptor)};
 
+json_to_record(<<"bank_account">>, DecodedResult) ->
+  proplist_to_bank_account(DecodedResult);
+
+json_to_record(<<"account">>, DecodedResult) ->
+  #stripe_account{id            = ?V(id),
+    email                       = ?V(email),
+    statement_descriptor        = ?V(statement_descriptor),
+    display_name                = ?V(display_name),
+    timezone                    = ?V(timezone),
+    details_submitted           = ?V(details_submitted),
+    charges_enabled             = ?V(charges_enabled),
+    transfers_enabled           = ?V(transfers_enabled),
+    currencies_supported        = ?V(currencies_supported),
+    default_currency            = ?V(default_currency),
+    country                     = ?V(country),
+    business_name               = ?V(business_name),
+    business_url                = ?V(business_url),
+    support_phone               = ?V(support_phone),
+    business_logo               = ?V(business_logo),
+    managed                     = ?V(managed),
+    product_description         = ?V(product_description),
+    debit_negative_balances     = ?V(debit_negative_balances),
+    bank_accounts               = proplist_to_bank_account_list(?V(bank_accounts)),
+    external_accounts           = proplist_to_bank_account_list(?V(external_accounts)),
+    verification                = proplist_to_stripe_verification(?V(verification)),
+    transfer_schedule           = proplist_to_transfer_schedule(?V(transfer_schedule)),
+    decline_charge_on           = proplist_to_decline_charge_on(?V(decline_charge_on)),
+    tos_acceptance              = proplist_to_tos_acceptance(?V(tos_acceptance)),
+    legal_entity                = proplist_to_legal_entity(?V(legal_entity))};
+
 json_to_record(Type, DecodedResult) ->
   error_logger:error_msg({unimplemented, ?MODULE, json_to_record, Type, DecodedResult}),
   {not_implemented_yet, Type, DecodedResult}.
+
+proplist_to_transfer_schedule(null) -> null;
+proplist_to_transfer_schedule(A) when is_binary(A) -> A;
+proplist_to_transfer_schedule(DecodedResult) ->
+  #stripe_transfer_schedule{interval  = check_to_atom(?V(interval)),
+    monthly_anchor                    = ?V(monthly_anchor),
+    weekly_anchor                     = ?V(weekly_anchor)}.
+
+proplist_to_decline_charge_on(null) -> null;
+proplist_to_decline_charge_on(A) when is_binary(A) -> A;
+proplist_to_decline_charge_on(DecodedResult) ->
+  #stripe_decline_charge_on{cvc_failure = check_to_atom(?V(cvc_failure)),
+    avs_failure                         = check_to_atom(?V(avs_failure))}.
+
+proplist_to_tos_acceptance(null) -> null;
+proplist_to_tos_acceptance(A) when is_binary(A) -> A;
+proplist_to_tos_acceptance(DecodedResult) ->
+  #stripe_tos_acceptance{ip = ?V(ip),
+    date                    = ?V(date),
+    user_agent              = ?V(user_agent)}.
+
+
+proplist_to_stripe_verification(null) -> null;
+proplist_to_stripe_verification(A) when is_binary(A) -> A;
+proplist_to_stripe_verification(DecodedResult) ->
+  #stripe_verification{fields_needed  = ?V(fields_needed),
+    disabled_reason                   = ?V(disabled_reason),
+    due_by                            = ?V(due_by)}.
+
+proplist_to_legal_entity(null) -> null;
+proplist_to_legal_entity(A) when is_binary(A) -> A;
+proplist_to_legal_entity(DecodedResult) ->
+  #stripe_legal_entity{business_name  = ?V(business_name),
+    address                           = proplist_to_address(?V(address)),
+    first_name                        = ?V(first_name),
+    last_name                         = ?V(last_name), 
+    personal_address                  = proplist_to_address(?V(personal_address)),
+    dob                               = proplist_to_date(?V(dob)),
+    verification                      = proplist_to_stripe_legal_entity_verification(?V(verification))}.
+
+proplist_to_address(null) -> null;
+proplist_to_address(A) when is_binary(A) -> A;
+proplist_to_address(DecodedResult) ->
+  #address{line1        = ?V(line1),
+    line2               = ?V(line2),
+    city                = ?V(city),
+    state               = ?V(state),
+    postal_code         = ?V(postal_code),
+    country             = ?V(country)}.
+
+proplist_to_date(null) -> null;
+proplist_to_date(A) when is_binary(A) -> A;
+proplist_to_date(DecodedResult) ->
+  #date{day     = ?V(day),
+    month       = ?V(month),
+    year        = ?V(year)}.
+
+proplist_to_stripe_legal_entity_verification(null) -> null;
+proplist_to_stripe_legal_entity_verification(A) when is_binary(A) -> A;
+proplist_to_stripe_legal_entity_verification(DecodedResult) ->
+  #stripe_legal_entity_verification{status  = check_to_atom(?V(status)),
+    details                                 = ?V(details),
+    document                                = ?V(document)}.
 
 proplist_to_card(null) -> null;
 proplist_to_card(A) when is_binary(A) -> A;
 proplist_to_card(Card) ->
   DecodedResult = Card,
-  #stripe_card{name                = ?V(name),
+  #stripe_card{id                  = ?V(id),
+               name                = ?V(name),
                last4               = ?V(last4),
+               funding             = ?V(funding),
                exp_month           = ?V(exp_month),
                exp_year            = ?V(exp_year),
                brand               = ?V(brand),
+               address_line1       = ?V(address_line1),
+               address_line2       = ?V(address_line2),
+               address_city        = ?V(address_city),
+               address_zip         = ?V(address_zip),
+               address_country     = ?V(address_country),
                cvc_check           = check_to_atom(?V(cvc_check)),
                address_line1_check = check_to_atom(?V(address_line1_check)),
                address_zip_check   = check_to_atom(?V(address_zip_check)),
-               country             = ?V(country)}.
+               tokenization        = ?V(tokenization),
+               dynamic_last4       = ?V(dynamic_last4),
+               country             = ?V(country),
+               fingerprint         = ?V(fingerprint),
+               recipient           = ?V(recipient),
+               customer            = ?V(customer),
+               account             = ?V(account),
+               currency            = ?V(currency),
+               default_for_currency = ?V(default_for_currency)}.
 
 proplist_to_plan(Plan) ->
   DecodedResult = Plan,
@@ -420,14 +682,42 @@ proplist_to_bank_account(null) -> null;
 proplist_to_bank_account(A) when is_binary(A) -> A;
 proplist_to_bank_account(BankAccount) ->
   DecodedResult = BankAccount,
-  #stripe_bank_account{fingerprint = ?V(fingerprint),
-                       bank_name  = ?V(bank_name),
-                       last4      = ?V(last4),
-                       country    = ?V(country),
-                       validated  = ?V(validated),
-                       description = ?V(description),
-                       recipient  = ?V(recipient),
-                       statement_descriptor = ?V(statement_descriptor)}.
+  #stripe_bank_account{id                   = ?V(id),
+                       currency             = ?V(currency),
+                       default_for_currency = check_to_atom(?V(default_for_currency)),
+                       % metadata = ???
+                       fingerprint          = ?V(fingerprint),
+                       bank_name            = ?V(bank_name),
+                       last4                = ?V(last4),
+                       country              = ?V(country),
+                       status               = check_to_atom(?V(status)),
+                       routing_number       = ?V(routing_number),
+                       account              = ?V(account)}.
+
+proplist_to_customer_sources(null) -> null;
+proplist_to_customer_sources(A) when is_binary(A) -> A;
+proplist_to_customer_sources(DecodedResult) ->
+  SrcList = ?V(data),
+  Fun = fun(Src) -> proplist_to_bank_or_card(Src) end,
+  lists:map(Fun, SrcList).
+
+proplist_to_bank_or_card(DecodedResult) ->
+  io:format("proplist_to_bank_or_card() : input is ~p", [DecodedResult]),
+  Object = ?V(object),
+  if 
+    Object == <<"bank_account">> -> proplist_to_bank_account(DecodedResult);
+    Object == <<"card">> -> proplist_to_card(DecodedResult);
+    true -> io:format("proplist_to_bank_or_card() cannot handle object type ~p", [Object]), 
+      []
+  end.
+
+proplist_to_bank_account_list(null) -> null;
+proplist_to_bank_account_list(A) when is_binary(A) -> A;
+proplist_to_bank_account_list(BankAccountsDictionary) ->
+  DecodedResult = BankAccountsDictionary, 
+  BAList = ?V(data),
+  Fun = fun(BA) -> proplist_to_bank_account(BA) end,
+  lists:map(Fun, BAList).
 
 check_to_atom(null) -> null;
 check_to_atom(A) when is_atom(A) -> A;
@@ -495,6 +785,26 @@ gen_url(Action) when is_atom(Action) ->
 gen_url(Action) when is_list(Action) ->
   "https://api.stripe.com/v1/" ++ Action.
 
+gen_account_url(AccountId) when is_binary(AccountId) ->
+  gen_account_url(binary_to_list(AccountId));
+gen_account_url(AccountId) when is_list(AccountId) ->
+  "https://api.stripe.com/v1/accounts/" ++ AccountId.
+
+gen_account_subresource_url(AccountId, Resource) when is_binary(AccountId) orelse 
+    is_binary(Resource) ->
+  AccountIdList = if 
+    is_binary(AccountId) -> binary_to_list(AccountId);
+    true -> AccountId
+  end,
+  ResourceList = if 
+    is_binary(Resource) -> binary_to_list(Resource);
+    true -> Resource
+  end,
+  gen_account_subresource_url(AccountIdList, ResourceList);
+gen_account_subresource_url(AccountId, Resource) when is_list(AccountId) and 
+    is_list(Resource) ->
+  "https://api.stripe.com/v1/accounts/" ++ AccountId ++ "/" ++ Resource.
+
 gen_customer_url(CustomerId) when is_binary(CustomerId) ->
   gen_customer_url(binary_to_list(CustomerId));
 gen_customer_url(CustomerId) when is_list(CustomerId) ->
@@ -531,3 +841,23 @@ gen_event_url(EventId) when is_binary(EventId) ->
   gen_event_url(binary_to_list(EventId));
 gen_event_url(EventId) when is_list(EventId) ->
   "https://api.stripe.com/v1/events/" ++ EventId.
+
+
+gen_paginated_url(Type) ->
+    gen_paginated_url(Type, 10, [], []).
+gen_paginated_url(Type, Limit) ->
+    gen_paginated_url(Type, Limit, [], []).
+gen_paginated_url(Type, Limit, StartingAfter) ->
+    gen_paginated_url(Type, Limit, StartingAfter, []).
+gen_paginated_url(Type, Limit, StartingAfter, EndingBefore) ->
+    Arguments = gen_args([{"limit", Limit},
+                          {"starting_after", StartingAfter},
+                          {"ending_before", EndingBefore}]),
+    gen_paginated_base_url(Type) ++ Arguments.
+
+gen_paginated_base_url(charges) ->
+    "https://api.stripe.com/v1/charges?";
+gen_paginated_base_url(customers) ->
+    "https://api.stripe.com/v1/customers?";
+gen_paginated_base_url(invoices) ->
+    "https://api.stripe.com/v1/invoices?".
