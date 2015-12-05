@@ -2,6 +2,7 @@
 %% ex: ft=erlang ts=2 sw=2 et
 -module(stripe).
 
+-export([get_record_id/1]).
 -export([token_create/10, token_create_bank/3, token_get_id/1]).
 -export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1]).
 -export([account_create/3, account_update/2, account_update_subresource/3, account_get/1, account_get_id/1]).%, customer_get/1, customer_update/3]).
@@ -344,6 +345,8 @@ request_all(Type, StartingAfter) ->
 
 get_record_id(Type) when is_record(Type, stripe_customer) ->
   Type#stripe_customer.id;
+get_record_id(Type) when is_record(Type, stripe_account) ->
+  Type#stripe_account.id;
 get_record_id(Type) when is_record(Type, stripe_charge) ->
   Type#stripe_charge.id.
 
