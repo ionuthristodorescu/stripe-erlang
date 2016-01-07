@@ -348,7 +348,8 @@ get_record_id(Type) when is_record(Type, stripe_customer) ->
 get_record_id(Type) when is_record(Type, stripe_account) ->
   Type#stripe_account.id;
 get_record_id(Type) when is_record(Type, stripe_charge) ->
-  Type#stripe_charge.id.
+  Type#stripe_charge.id;
+get_record_id(_Type) -> error. % anything else
 
 request_run(URL, Method, Fields) ->
   Headers = [{"X-Stripe-Client-User-Agent", ua_json()},
