@@ -358,6 +358,10 @@ get_record_id(Type) when is_record(Type, stripe_account) ->
   Type#stripe_account.id;
 get_record_id(Type) when is_record(Type, stripe_charge) ->
   Type#stripe_charge.id;
+get_record_id(Type) when is_record(Type, stripe_error) ->
+  {stripe_error, ErrorType, _ErrorCode, ErrorMessage, _ErrorParam,
+    _HttpErrorCode, _HttpErrorCodeMeaning} = Type,
+  {error, ErrorType, ErrorMessage};
 get_record_id(_Type) -> error. % anything else
 
 request_run(URL, Method, Fields) ->
