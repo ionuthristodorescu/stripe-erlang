@@ -4,7 +4,7 @@
 
 -export([get_record_id/1]).
 -export([token_create/10, token_create_bank/3, token_get_id/1]).
--export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1]).
+-export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1, customer_get_card_details/1]).
 -export([account_create/3, account_update/2, account_update_subresource/3, account_get/1, account_get_id/1]).%, customer_get/1, customer_update/3]).
 -export([managed_account_charge_customer/5]).
 -export([charge_customer/4, charge_card/4]).
@@ -113,6 +113,15 @@ customer_get(CustomerId) ->
 -spec customer_get_id(#stripe_customer{}) -> customer_id().
 customer_get_id(StripeCustomer) ->
   StripeCustomer#stripe_customer.id.
+
+-spec customer_get_card_details(#stripe_customer{}) -> result.
+customer_get_card_details(StripeCustomer) ->
+  F = fun(StripeCard) ->
+    #stripe_card{exp_year = ExpYear, exp_month = ExpMonth, brand = Brand, last4 = Last4,
+      name = Name, cvc_check = CVCCheck} = StripeCard,
+    {ExpYear, ExpMonth, Brand, Last4, Name, CVCCheck}
+  end,
+  lists:map(F, StripeCustomer#stripe_customer.sources).
 
 %%%--------------------------------------------------------------------
 %%% Customer Updating
