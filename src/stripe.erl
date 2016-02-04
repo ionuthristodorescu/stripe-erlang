@@ -4,7 +4,8 @@
 
 -export([get_record_id/1]).
 -export([token_create/10, token_create_bank/3, token_get_id/1]).
--export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1, customer_get_card_details/1]).
+-export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1, customer_get_card_details/1,
+  customer_update_subresource/3]).
 -export([account_create/3, account_update/2, account_update_subresource/3, account_get/1, account_get_id/1]).%, customer_get/1, customer_update/3]).
 -export([managed_account_charge_customer/5]).
 -export([charge_customer/4, charge_card/4]).
@@ -17,6 +18,7 @@
 -export([gen_paginated_url/1, gen_paginated_url/2,
          gen_paginated_url/3, gen_paginated_url/4]).
 -export([get_all_customers/0, get_num_customers/1]).
+-export([customer_card_create/3]).
 
 -include("stripe.hrl").
 
@@ -104,6 +106,14 @@ customer_create(Card, Email, Desc) ->
   request_customer_create(Fields).
 
 %%%--------------------------------------------------------------------
+%%% Customer Card Creation - uses the card API
+%%%--------------------------------------------------------------------
+-spec customer_card_create(token_id(), customer_id(), desc()) -> result.
+customer_card_create(CardToken, CustomerId, Desc) ->
+  Fields = [{source, CardToken}],
+  request_customer_update_subresource(CustomerId, "cards", Fields).
+
+%%%--------------------------------------------------------------------
 %%% Customer Fetching
 %%%--------------------------------------------------------------------
 -spec customer_get(customer_id()) -> result.
@@ -132,6 +142,9 @@ customer_update(CustomerId, Token, Email) ->
             {"email", Email}],
   request_customer_update(CustomerId, Fields).
 
+-spec customer_update_subresource(customer_id(), desc(), list()) -> result.
+customer_update_subresource(CustomerId, Resource, Fields) ->
+  request_customer_update_subresource(CustomerId, Resource, Fields).
 %%%--------------------------------------------------------------------
 %%% Token Generation
 %%%--------------------------------------------------------------------
@@ -275,6 +288,9 @@ request_account_update(AccountId, Fields) ->
 
 request_account_update_subresource(AccountId, Resource, Fields) ->
   request_run(gen_account_subresource_url(AccountId, Resource), post, Fields).
+
+request_customer_update_subresource(CustomerId, Resource, Fields) ->
+  request_run(gen_customer_subresource_url(CustomerId, Resource), post, Fields).
 
 request_account(AccountId) ->
   request_run(gen_account_url(AccountId), get, []).
@@ -818,6 +834,20 @@ gen_account_subresource_url(AccountId, Resource) when is_binary(AccountId) orels
 gen_account_subresource_url(AccountId, Resource) when is_list(AccountId) and 
     is_list(Resource) ->
   "https://api.stripe.com/v1/accounts/" ++ AccountId ++ "/" ++ Resource.
+
+gen_customer_subresource_url(AccountId, Resource) when is_binary(CustomerId) orelse
+  is_binary(Resource) ->
+  CustomerIdList = if
+    is_binary(CustomerId) -> binary_to_list(CustomerId);
+    true -> CustomerId end,
+  ResourceList = if
+    is_binary(Resource) -> binary_to_list(Resource);
+    true -> Resource end,
+  gen_account_subresource_url(CustomerIdList, ResourceList);
+gen_customer_subresource_url(CustomerId, Resource) when is_list(CustomerId) and
+  is_list(Resource) ->
+  "https://api.stripe.com/v1/customers/" ++ AccountId ++ "/" ++ Resource.
+
 
 gen_customer_url(CustomerId) when is_binary(CustomerId) ->
   gen_customer_url(binary_to_list(CustomerId));
