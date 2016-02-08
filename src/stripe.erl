@@ -873,7 +873,7 @@ gen_customer_subresource_url(CustomerId, Resource) when is_binary(CustomerId) or
     if
       is_binary(Resource) -> binary_to_list(Resource);
       true -> Resource end,
-  gen_account_subresource_url(CustomerIdList, ResourceList);
+  gen_customer_subresource_url(CustomerIdList, ResourceList);
 gen_customer_subresource_url(CustomerId, Resource) when is_list(CustomerId) and
   is_list(Resource) ->
   "https://api.stripe.com/v1/customers/" ++ CustomerId ++ "/" ++ Resource.
