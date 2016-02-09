@@ -18,7 +18,7 @@
 -export([gen_paginated_url/1, gen_paginated_url/2,
   gen_paginated_url/3, gen_paginated_url/4]).
 -export([get_all_customers/0, get_num_customers/1]).
--export([customer_card_create/2]).
+-export([customer_card_create/2, customer_card_delete/2]).
 
 -include("stripe.hrl").
 
@@ -114,6 +114,10 @@ customer_card_create(CardToken, CustomerId) ->
   % TODO: changed "cards" to "sources" below, which one should we use ... ?
   request_customer_update_subresource(CustomerId, "sources", Fields).
 
+-spec customer_card_delete(card_id(), customer_id()) -> result.
+customer_card_delete(CardId, CustomerId) ->
+  request_customer_delete_subresource(CustomerId, "sources", CardId).
+
 %%%--------------------------------------------------------------------
 %%% Customer Fetching
 %%%--------------------------------------------------------------------
@@ -128,9 +132,9 @@ customer_get_id(StripeCustomer) ->
 -spec customer_get_card_details(#stripe_customer{}) -> result.
 customer_get_card_details(StripeCustomer) ->
   F = fun(StripeCard) ->
-    #stripe_card{exp_year = ExpYear, exp_month = ExpMonth, brand = Brand, last4 = Last4,
+    #stripe_card{id = Id, exp_year = ExpYear, exp_month = ExpMonth, brand = Brand, last4 = Last4,
       name = Name, cvc_check = CVCCheck} = StripeCard,
-    {ExpYear, ExpMonth, Brand, Last4, Name, CVCCheck}
+    {Id, ExpYear, ExpMonth, Brand, Last4, Name, CVCCheck}
   end,
   lists:map(F, StripeCustomer#stripe_customer.sources).
 
@@ -292,6 +296,10 @@ request_account_update_subresource(AccountId, Resource, Fields) ->
 
 request_customer_update_subresource(CustomerId, Resource, Fields) ->
   request_run(gen_customer_subresource_url(CustomerId, Resource), post, Fields).
+
+request_customer_delete_subresource(CustomerId, Resource, ResourceId) ->
+  request_run(gen_customer_subresource_url(CustomerId, Resource) ++
+    "/" ++ ResourceId, delete, []).
 
 request_account(AccountId) ->
   request_run(gen_account_url(AccountId), get, []).
