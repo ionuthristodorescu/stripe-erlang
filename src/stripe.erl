@@ -18,7 +18,7 @@
 -export([gen_paginated_url/1, gen_paginated_url/2,
   gen_paginated_url/3, gen_paginated_url/4]).
 -export([get_all_customers/0, get_num_customers/1]).
--export([customer_card_create/2, customer_card_delete/2]).
+-export([customer_card_create/2, customer_card_delete/2, customer_card_update/10]).
 
 -include("stripe.hrl").
 
@@ -117,6 +117,21 @@ customer_card_create(CardToken, CustomerId) ->
 -spec customer_card_delete(card_id(), customer_id()) -> result.
 customer_card_delete(CardId, CustomerId) ->
   request_customer_delete_subresource(CustomerId, "sources", CardId).
+
+-spec customer_card_update(card_id(), customer_id(), string(), string(), string(),
+  string(), string(), integer(), integer(), string()) -> result.
+customer_card_update(CardId, CustomerId, AddrLine1, AddrLine2, City, Zip, Country, ExpMonth,
+    ExpYear, Name) ->
+  Fields = [
+    {address_line1, AddrLine1},
+    {address_line2, AddrLine2},
+    {address_city, City},
+    {address_zip, Zip},
+    {address_country, Country},
+    {exp_month = ExpMonth},
+    {exp_year = ExpYear},
+    {name = Name}],
+  request_customer_update_subresource(CustomerId, "sources" ++ "/" ++ CardId, Fields).
 
 %%%--------------------------------------------------------------------
 %%% Customer Fetching
