@@ -128,10 +128,11 @@ customer_card_update(CardId, CustomerId, AddrLine1, AddrLine2, City, Zip, Countr
     {address_city, City},
     {address_zip, Zip},
     {address_country, Country},
-    {exp_month = ExpMonth},
-    {exp_year = ExpYear},
-    {name = Name}],
-  request_customer_update_subresource(CustomerId, "sources" ++ "/" ++ CardId, Fields).
+    {exp_month, ExpMonth},
+    {exp_year, ExpYear},
+    {name, Name}],
+  FilteredFields = [{Key, Value} || {Key, Value} <- Fields, Value /= undefined],
+  request_customer_update_subresource(CustomerId, "sources" ++ "/" ++ CardId, FilteredFields).
 
 %%%--------------------------------------------------------------------
 %%% Customer Fetching
@@ -148,8 +149,10 @@ customer_get_id(StripeCustomer) ->
 customer_get_card_details(StripeCustomer) ->
   F = fun(StripeCard) ->
     #stripe_card{id = Id, exp_year = ExpYear, exp_month = ExpMonth, brand = Brand, last4 = Last4,
-      name = Name, cvc_check = CVCCheck} = StripeCard,
-    {Id, ExpYear, ExpMonth, Brand, Last4, Name, CVCCheck}
+      name = Name, cvc_check = CVCCheck, address_line1 = AddrLine1, address_line2 = AddrLine2,
+      address_city = City, address_zip = Zip, address_country = Country} = StripeCard,
+    {Id, ExpYear, ExpMonth, Brand, Last4, Name, CVCCheck,
+      AddrLine1, AddrLine2, City, Zip, Country}
   end,
   lists:map(F, StripeCustomer#stripe_customer.sources).
 
