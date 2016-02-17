@@ -6,7 +6,8 @@
 -export([token_create/10, token_create_bank/3, token_get_id/1]).
 -export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1, customer_get_card_details/1,
   customer_update_subresource/3]).
--export([account_create/3, account_update/2, account_update_subresource/3, account_get/1, account_get_id/1]).%, customer_get/1, customer_update/3]).
+-export([account_create/3, account_update/2, account_update_subresource/3, account_get/1,
+  account_get_id/1, account_get_bank_details/1]).%, customer_get/1, customer_update/3]).
 -export([managed_account_charge_customer/5]).
 -export([charge_customer/4, charge_card/4]).
 -export([subscription_update/3, subscription_update/5,
@@ -32,21 +33,21 @@
 %%%--------------------------------------------------------------------
 %%% Charging
 %%%--------------------------------------------------------------------
--spec charge_customer(price(), currency(), customer_id(), desc()) -> result.
+-spec charge_customer(price(), currency(), customer_id(), desc()) -> term().
 charge_customer(Amount, Currency, Customer, Desc) ->
   charge(Amount, Currency, {customer, Customer}, {}, Desc).
 
--spec managed_account_charge_customer(price(), currency(), customer_id(), account_id(), desc()) -> result.
+-spec managed_account_charge_customer(price(), currency(), customer_id(), account_id(), desc()) -> term().
 managed_account_charge_customer(Amount, Currency, CustomerSrc, AccountDest, Desc) ->
   charge(Amount, Currency, {customer, CustomerSrc}, {destination, AccountDest}, Desc).
 
--spec charge_card(price(), currency(), token_id(), desc()) -> result.
+-spec charge_card(price(), currency(), token_id(), desc()) -> term().
 charge_card(Amount, Currency, Card, Desc) ->
   charge(Amount, Currency, {card, Card}, {}, Desc).
 
 -spec charge(price(), currency(),
     {customer, customer_id()} | {card, token_id()},
-    {} | {destination, account_id()}, desc()) -> result.
+    {} | {destination, account_id()}, desc()) -> term().
 charge(Amount, Currency, CustomerOrCard, Destination, Desc) when
   Amount > 50 andalso is_tuple(CustomerOrCard) andalso is_tuple(Destination) ->
   F = [{amount, Amount},
@@ -62,7 +63,7 @@ charge(Amount, Currency, CustomerOrCard, Destination, Desc) when
 %%%--------------------------------------------------------------------
 %%% Account Creation
 %%%--------------------------------------------------------------------
--spec account_create(account_type(), country(), email()) -> result.
+-spec account_create(account_type(), country(), email()) -> term().
 account_create(AcctType, Country, Email) ->
   DefaultFields = [{country, Country},
     {email, Email}],
@@ -76,18 +77,18 @@ account_create(AcctType, Country, Email) ->
 %%%--------------------------------------------------------------------
 %%% Account Updating
 %%%--------------------------------------------------------------------
--spec account_update(account_id(), list()) -> result.
+-spec account_update(account_id(), list()) -> term().
 account_update(AcctId, Fields) ->
   request_account_update(AcctId, Fields).
 
--spec account_update_subresource(account_id(), desc(), list()) -> result.
+-spec account_update_subresource(account_id(), desc(), list()) -> term().
 account_update_subresource(AcctId, Resource, Fields) ->
   request_account_update_subresource(AcctId, Resource, Fields).
 
 %%%--------------------------------------------------------------------
 %%% Account Fetching
 %%%--------------------------------------------------------------------
--spec account_get(account_id()) -> result.
+-spec account_get(account_id()) -> term().
 account_get(AccountId) ->
   request_account(AccountId).
 
@@ -95,10 +96,21 @@ account_get(AccountId) ->
 account_get_id(StripeAccount) ->
   StripeAccount#stripe_account.id.
 
+-spec account_get_bank_details(#stripe_account{}) -> term().
+account_get_bank_details(StripeAccount) ->
+  F = fun(StripeBankAccount) ->
+    #stripe_bank_account{id = Id, currency = _Currency, default_for_currency = _DefaultForCurrency,
+      metadata = _Metadata, fingerprint = _Fingerprint, bank_name = BankName,
+      last4 = Last4, country = _Country, status = _Status, routing_number = RoutingNumber,
+      account = _StripeAccount} = StripeBankAccount,
+    {Id, Last4, BankName, RoutingNumber} end,
+  lists:map(F, StripeAccount#stripe_account.bank_accounts).
+
+
 %%%--------------------------------------------------------------------
 %%% Customer Creation
 %%%--------------------------------------------------------------------
--spec customer_create(token_id(), email(), desc()) -> result.
+-spec customer_create(token_id(), email(), desc()) -> term().
 customer_create(Card, Email, Desc) ->
   Fields = [{card, Card},
     {email, Email},
@@ -108,18 +120,18 @@ customer_create(Card, Email, Desc) ->
 %%%--------------------------------------------------------------------
 %%% Customer Card Creation - uses the card API
 %%%--------------------------------------------------------------------
--spec customer_card_create(token_id(), customer_id()) -> result.
+-spec customer_card_create(token_id(), customer_id()) -> term().
 customer_card_create(CardToken, CustomerId) ->
   Fields = [{source, CardToken}],
   % TODO: changed "cards" to "sources" below, which one should we use ... ?
   request_customer_update_subresource(CustomerId, "sources", Fields).
 
--spec customer_card_delete(card_id(), customer_id()) -> result.
+-spec customer_card_delete(card_id(), customer_id()) -> term().
 customer_card_delete(CardId, CustomerId) ->
   request_customer_delete_subresource(CustomerId, "sources", CardId).
 
 -spec customer_card_update(card_id(), customer_id(), string(), string(), string(),
-  string(), string(), integer(), integer(), string()) -> result.
+  string(), string(), integer(), integer(), string()) -> term().
 customer_card_update(CardId, CustomerId, AddrLine1, AddrLine2, City, Zip, Country, ExpMonth,
     ExpYear, Name) ->
   Fields = [
@@ -137,7 +149,7 @@ customer_card_update(CardId, CustomerId, AddrLine1, AddrLine2, City, Zip, Countr
 %%%--------------------------------------------------------------------
 %%% Customer Fetching
 %%%--------------------------------------------------------------------
--spec customer_get(customer_id()) -> result.
+-spec customer_get(customer_id()) -> term().
 customer_get(CustomerId) ->
   request_customer(CustomerId).
 
@@ -145,7 +157,7 @@ customer_get(CustomerId) ->
 customer_get_id(StripeCustomer) ->
   StripeCustomer#stripe_customer.id.
 
--spec customer_get_card_details(#stripe_customer{}) -> result.
+-spec customer_get_card_details(#stripe_customer{}) -> term().
 customer_get_card_details(StripeCustomer) ->
   F = fun(StripeCard) ->
     #stripe_card{id = Id, exp_year = ExpYear, exp_month = ExpMonth, brand = Brand, last4 = Last4,
@@ -159,13 +171,13 @@ customer_get_card_details(StripeCustomer) ->
 %%%--------------------------------------------------------------------
 %%% Customer Updating
 %%%--------------------------------------------------------------------
--spec customer_update(customer_id(), token_id(), email()) -> result.
+-spec customer_update(customer_id(), token_id(), email()) -> term().
 customer_update(CustomerId, Token, Email) ->
   Fields = [{"card", Token},
     {"email", Email}],
   request_customer_update(CustomerId, Fields).
 
--spec customer_update_subresource(customer_id(), desc(), list()) -> result.
+-spec customer_update_subresource(customer_id(), desc(), list()) -> term().
 customer_update_subresource(CustomerId, Resource, Fields) ->
   request_customer_update_subresource(CustomerId, Resource, Fields).
 %%%--------------------------------------------------------------------
