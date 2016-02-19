@@ -149,6 +149,7 @@ zar | % south african rand
 zmw.  % zambian kwacha
 -type customer_id() :: binary(). % cu_* | cus_*  (docs show both in use)
 -type card_id() :: binary(). % card_*
+-type bank_account_id() :: binary(). % ba_*
 -type account_id() :: binary(). % acct_*
 -type coupon_id() :: binary(). % user specidied coupon ID
 -type plan_id() :: binary(). % user specified plan ID

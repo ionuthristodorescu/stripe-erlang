@@ -20,6 +20,7 @@
   gen_paginated_url/3, gen_paginated_url/4]).
 -export([get_all_customers/0, get_num_customers/1]).
 -export([customer_card_create/2, customer_card_delete/2, customer_card_update/10]).
+-export([account_bank_account_create/2, account_bank_account_delete/2]).
 
 -include("stripe.hrl").
 
@@ -106,6 +107,17 @@ account_get_bank_details(StripeAccount) ->
     {Id, Last4, BankName, RoutingNumber} end,
   lists:map(F, StripeAccount#stripe_account.bank_accounts).
 
+%%%--------------------------------------------------------------------
+%%% Account Bank Account Creation - uses the Bank Account API
+%%%--------------------------------------------------------------------
+-spec account_bank_account_create(token_id(), account_id()) -> term().
+account_bank_account_create(BankToken, AccountId) ->
+  Fields = [{source, BankToken}],
+  request_account_update_subresource(AccountId, "external_accounts", Fields).
+
+-spec account_bank_account_delete(bank_account_id(), account_id()) -> term().
+account_bank_account_delete(BankAccountId, AccountId) ->
+  request_account_delete_subresource(AccountId, "external_accounts", BankAccountId).
 
 %%%--------------------------------------------------------------------
 %%% Customer Creation
@@ -323,6 +335,10 @@ request_account_update(AccountId, Fields) ->
 
 request_account_update_subresource(AccountId, Resource, Fields) ->
   request_run(gen_account_subresource_url(AccountId, Resource), post, Fields).
+
+request_account_delete_subresource(AccountId, Resource, ResourceId) ->
+  request_run(gen_account_subresource_url(AccountId, Resource) ++
+    "/" ++ ResourceId, delete, []).
 
 request_customer_update_subresource(CustomerId, Resource, Fields) ->
   request_run(gen_customer_subresource_url(CustomerId, Resource), post, Fields).
