@@ -7,7 +7,7 @@
 -export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1, customer_get_card_details/1,
   customer_update_subresource/3]).
 -export([account_create/3, account_update/2, account_update_subresource/3, account_get/1,
-  account_get_id/1, account_get_bank_details/1]).%, customer_get/1, customer_update/3]).
+  account_get_id/1, account_get_email/1, account_get_bank_details/1]).%, customer_get/1, customer_update/3]).
 -export([managed_account_charge_customer/5]).
 -export([charge_customer/4, charge_card/4]).
 -export([subscription_update/3, subscription_update/5,
@@ -96,6 +96,10 @@ account_get(AccountId) ->
 -spec account_get_id(#stripe_account{}) -> account_id().
 account_get_id(StripeAccount) ->
   StripeAccount#stripe_account.id.
+
+-spec account_get_email(#stripe_account{}) -> email().
+account_get_email(StripeAccount) ->
+  StripeAccount#stripe_account.email.
 
 -spec account_get_bank_details(#stripe_account{}) -> term().
 account_get_bank_details(StripeAccount) ->
