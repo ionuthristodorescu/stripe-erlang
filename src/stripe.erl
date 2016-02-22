@@ -116,7 +116,7 @@ account_get_bank_details(StripeAccount) ->
 %%%--------------------------------------------------------------------
 -spec account_bank_account_create(token_id(), account_id()) -> term().
 account_bank_account_create(BankToken, AccountId) ->
-  Fields = [{source, BankToken}],
+  Fields = [{external_account, BankToken}],
   request_account_update_subresource(AccountId, "external_accounts", Fields).
 
 -spec account_bank_account_delete(bank_account_id(), account_id()) -> term().
