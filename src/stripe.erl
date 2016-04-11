@@ -688,8 +688,15 @@ json_to_record(<<"card">>, DecodedResult) ->
     currency = ?V(currency),
     default_for_currency = ?V(default_for_currency)};
 
+json_to_record(undefined, DecodedResult) ->
+  % let's check here if maybe this is a reply for a DELETE operation
+  case ?V(deleted) of
+    true -> {deleted, ?V(id)};
+    _ -> json_to_record(unknown_type, DecodedResult)
+  end;
+
 json_to_record(Type, DecodedResult) ->
-  error_logger:error_msg({unimplemented, ?MODULE, json_to_record, Type, DecodedResult}),
+  error_logger:error_msg("Stripe : ~p", [[{unimplemented, ?MODULE, json_to_record, Type, DecodedResult}]]),
   {not_implemented_yet, Type, DecodedResult}.
 
 proplist_to_transfer_schedule(null) -> null;
