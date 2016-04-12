@@ -6,7 +6,7 @@
 -export([token_create/10, token_create_bank/3, token_get_id/1]).
 -export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1, customer_get_card_details/1,
   customer_update_subresource/3]).
--export([account_create/3, account_update/2, account_update_subresource/3, account_get/1,
+-export([account_create/10, account_update/2, account_update_subresource/3, account_get/1,
   account_get_id/1, account_get_email/1, account_get_bank_details/1]).%, customer_get/1, customer_update/3]).
 -export([managed_account_charge_customer/5]).
 -export([charge_customer/4, charge_card/4]).
@@ -64,10 +64,20 @@ charge(Amount, Currency, CustomerOrCard, Destination, Desc) when
 %%%--------------------------------------------------------------------
 %%% Account Creation
 %%%--------------------------------------------------------------------
--spec account_create(account_type(), country(), email()) -> term().
-account_create(AcctType, Country, Email) ->
+-spec account_create(account_type(), country(), email(), tuple(), string(), string(), string(), epoch(), string(), string()) -> term().
+account_create(AcctType, Country, Email, {Day, Month, Year}, FirstName, LastName, LegalEntityType, Date, IP, BusinessName) ->
   DefaultFields = [{country, Country},
-    {email, Email}],
+    {email, Email},
+    {"legal_entity[dob][day]", Day},
+    {"legal_entity[dob][month]", Month},
+    {"legal_entity[dob][year]", Year},
+    {"legal_entity[first_name]", FirstName},
+    {"legal_entity[last_name]", LastName},
+    {"legal_entity[type]", LegalEntityType},
+    {"tos_acceptance[date]", Date},
+    {"tos_acceptance[ip]", IP},
+    {"legal_entity[business_name]", BusinessName}
+  ],
   Fields = if
              AcctType == managed -> DefaultFields ++ [{managed, true}];
              AcctType == standalone -> DefaultFields;
