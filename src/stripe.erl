@@ -8,7 +8,7 @@
   customer_update_subresource/3]).
 -export([account_create/10, account_update/2, account_update_subresource/3, account_get/1,
   account_get_id/1, account_get_email/1, account_get_bank_details/1]).%, customer_get/1, customer_update/3]).
--export([managed_account_charge_customer/5]).
+-export([managed_account_charge_customer/6]).
 -export([charge_customer/4, charge_card/4]).
 -export([subscription_update/3, subscription_update/5,
   subscription_update/6, subscription_cancel/2, subscription_cancel/3]).
@@ -36,29 +36,29 @@
 %%%--------------------------------------------------------------------
 -spec charge_customer(price(), currency(), customer_id(), desc()) -> term().
 charge_customer(Amount, Currency, Customer, Desc) ->
-  charge(Amount, Currency, {customer, Customer}, {}, Desc).
+  charge(Amount, Currency, [{customer, Customer}], Desc).
 
--spec managed_account_charge_customer(price(), currency(), customer_id(), account_id(), desc()) -> term().
-managed_account_charge_customer(Amount, Currency, CustomerSrc, AccountDest, Desc) ->
-  charge(Amount, Currency, {customer, CustomerSrc}, {destination, AccountDest}, Desc).
+-spec managed_account_charge_customer(price(), currency(), customer_id(), account_id(), desc(), binary()) -> term().
+managed_account_charge_customer(Amount, Currency, CustomerSrc, AccountDest, Desc, CardId) ->
+  charge(Amount, Currency, [{customer, CustomerSrc}, {destination, AccountDest}] ++
+    case is_binary(CardId) of
+      true -> [{source, CardId}];
+      _ -> []
+    end,
+    Desc).
 
 -spec charge_card(price(), currency(), token_id(), desc()) -> term().
 charge_card(Amount, Currency, Card, Desc) ->
-  charge(Amount, Currency, {card, Card}, {}, Desc).
+  charge(Amount, Currency, [{card, Card}], Desc).
 
 -spec charge(price(), currency(),
-    {customer, customer_id()} | {card, token_id()},
-    {} | {destination, account_id()}, desc()) -> term().
-charge(Amount, Currency, CustomerOrCard, Destination, Desc) when
-  Amount > 50 andalso is_tuple(CustomerOrCard) andalso is_tuple(Destination) ->
-  F = [{amount, Amount},
-    {currency, Currency},
-    CustomerOrCard,
-    {description, Desc}],
-  Fields = if
-             Destination == {} -> F;
-             true -> F ++ [Destination]
-           end,
+    %{customer, customer_id()} | {card, token_id()}, {} | {destination, account_id()},
+    list(), desc()) -> term().
+charge(Amount, Currency, Params, Desc) when Amount > 50 ->
+  Fields = [{amount, Amount},
+    {currency, Currency}] ++
+    Params ++
+    [{description, Desc}],
   request_charge(Fields).
 
 %%%--------------------------------------------------------------------
