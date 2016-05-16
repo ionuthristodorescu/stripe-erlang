@@ -19,7 +19,7 @@
 -export([gen_paginated_url/1, gen_paginated_url/2,
   gen_paginated_url/3, gen_paginated_url/4]).
 -export([get_all_customers/0, get_num_customers/1]).
--export([customer_card_create/2, customer_card_delete/2, customer_card_update/10]).
+-export([customer_card_create/2, customer_card_delete/2, customer_card_update/11]).
 -export([account_bank_account_create/2, account_bank_account_delete/2]).
 
 -include("stripe.hrl").
@@ -157,8 +157,8 @@ customer_card_delete(CardId, CustomerId) ->
   request_customer_delete_subresource(CustomerId, "sources", CardId).
 
 -spec customer_card_update(card_id(), customer_id(), string(), string(), string(),
-  string(), string(), integer(), integer(), string()) -> term().
-customer_card_update(CardId, CustomerId, AddrLine1, AddrLine2, City, Zip, Country, ExpMonth,
+  string(), string(), string(), integer(), integer(), string()) -> term().
+customer_card_update(CardId, CustomerId, AddrLine1, AddrLine2, City, Zip, State, Country, ExpMonth,
     ExpYear, Name) ->
   Fields = [
     {address_line1, AddrLine1},
@@ -166,6 +166,7 @@ customer_card_update(CardId, CustomerId, AddrLine1, AddrLine2, City, Zip, Countr
     {address_city, City},
     {address_zip, Zip},
     {address_country, Country},
+    {address_state, State},
     {exp_month, ExpMonth},
     {exp_year, ExpYear},
     {name, Name}],
