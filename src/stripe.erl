@@ -188,9 +188,9 @@ customer_get_card_details(StripeCustomer) ->
   F = fun(StripeCard) ->
     #stripe_card{id = Id, exp_year = ExpYear, exp_month = ExpMonth, brand = Brand, last4 = Last4,
       name = Name, cvc_check = CVCCheck, address_line1 = AddrLine1, address_line2 = AddrLine2,
-      address_city = City, address_zip = Zip, address_country = Country} = StripeCard,
+      address_city = City, address_zip = Zip, address_state = AddressState, address_country = Country} = StripeCard,
     {Id, ExpYear, ExpMonth, Brand, Last4, Name, CVCCheck,
-      AddrLine1, AddrLine2, City, Zip, Country}
+      AddrLine1, AddrLine2, City, Zip, AddressState, Country}
   end,
   lists:map(F, StripeCustomer#stripe_customer.sources).
 
@@ -684,6 +684,7 @@ json_to_record(<<"card">>, DecodedResult) ->
     address_line2 = ?V(address_line2),
     address_city = ?V(address_city),
     address_zip = ?V(address_zip),
+    address_state = ?V(address_state),
     address_country = ?V(address_country),
     cvc_check = check_to_atom(?V(cvc_check)),
     address_line1_check = check_to_atom(?V(address_line1_check)),
@@ -786,6 +787,7 @@ proplist_to_card(Card) ->
     address_line1 = ?V(address_line1),
     address_line2 = ?V(address_line2),
     address_city = ?V(address_city),
+    address_state = ?V(address_state),
     address_zip = ?V(address_zip),
     address_country = ?V(address_country),
     cvc_check = check_to_atom(?V(cvc_check)),
