@@ -40,7 +40,11 @@ charge_customer(Amount, Currency, Customer, Desc) ->
 
 -spec managed_account_charge_customer(price(), currency(), customer_id(), account_id(), desc(), binary()) -> term().
 managed_account_charge_customer(Amount, Currency, CustomerSrc, AccountDest, Desc, CardId) ->
-  charge(Amount, Currency, [{customer, CustomerSrc}, {destination, AccountDest}] ++
+  charge(Amount, Currency,
+    case is_binary(CustomerSrc) of
+      true -> [{customer, CustomerSrc}];
+      _ -> []
+    end ++ [{destination, AccountDest}] ++
     case is_binary(CardId) of
       true -> [{source, CardId}];
       _ -> []
