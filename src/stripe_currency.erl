@@ -22,8 +22,8 @@ load() ->
 -spec load(file:filename_all()) -> currency_dict().
 load(Filename) ->
     {ok, JSON} = file:read_file(Filename),
-    Proplist = mochijson2:decode(JSON, [{format, proplist}]),
-    CD = dict:from_list(proplists:get_value(<<"rates">>, Proplist)),
+    Proplist = json:decode(JSON),
+    CD = dict:from_list(json:get_value(<<"rates">>, Proplist)),
     application:set_env(stripe, currency_dict, CD),
     CD.
 
