@@ -4,7 +4,7 @@
 
 -export([get_record_id/1]).
 -export([token_create/10, token_create_bank/3, token_get_id/1]).
--export([customer_create/3, customer_get/1, customer_update/3, customer_get_id/1, customer_get_card_details/1,
+-export([customer_create/4, customer_get/1, customer_update/3, customer_get_id/1, customer_get_card_details/1,
   customer_update_subresource/3]).
 -export([account_create/10, account_update/2, account_update_subresource/3, account_get/1,
   account_get_id/1, account_get_email/1, account_get_bank_details/1]).%, customer_get/1, customer_update/3]).
@@ -150,11 +150,15 @@ account_bank_account_delete(BankAccountId, AccountId) ->
 %%%--------------------------------------------------------------------
 %%% Customer Creation
 %%%--------------------------------------------------------------------
--spec customer_create(token_id(), email(), desc()) -> term().
-customer_create(Card, Email, Desc) ->
+-spec customer_create(token_id(), email(), desc(), plan_id()) -> term().
+customer_create(Card, Email, Desc, Plan) ->
   Fields = [{card, Card},
     {email, Email},
-    {description, Desc}],
+    {description, Desc}] ++
+  case Plan of
+    undefined -> [];
+    _ -> [{plan, Plan}]
+  end,
   request_customer_create(Fields).
 
 %%%--------------------------------------------------------------------
