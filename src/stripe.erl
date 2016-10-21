@@ -21,6 +21,7 @@
 -export([get_all_customers/0, get_num_customers/1]).
 -export([customer_card_create/2, customer_card_delete/2, customer_card_update/11]).
 -export([account_bank_account_create/2, account_bank_account_delete/2]).
+-export([plans_get/0]).
 
 -include("stripe.hrl").
 
@@ -31,6 +32,15 @@
 % this number if stripe changes it in the future
 % See: https://stripe.com/docs/api#pagination
 -define(STRIPE_LIST_LIMIT, 100).
+
+%%%--------------------------------------------------------------------
+%%% Subscription plans
+%%%--------------------------------------------------------------------
+-spec plans_get() -> term().
+plans_get() ->
+  request_plans().
+
+
 %%%--------------------------------------------------------------------
 %%% Charging
 %%%--------------------------------------------------------------------
@@ -365,6 +375,9 @@ request_customer_update_subresource(CustomerId, Resource, Fields) ->
 request_customer_delete_subresource(CustomerId, Resource, ResourceId) ->
   request_run(gen_customer_subresource_url(CustomerId, Resource) ++
     "/" ++ ResourceId, delete, []).
+
+request_plans() ->
+  request_run(gen_url(plans), get, []).
 
 request_account(AccountId) ->
   request_run(gen_account_url(AccountId), get, []).
@@ -704,6 +717,9 @@ json_to_record(<<"card">>, DecodedResult) ->
     currency = ?V(currency),
     default_for_currency = ?V(default_for_currency)};
 
+json_to_record(<<"plan">>, DecodedResult) ->
+  proplist_to_plan(DecodedResult);
+
 json_to_record(undefined, DecodedResult) ->
   % let's check here if maybe this is a reply for a DELETE operation
   case ?V(deleted) of
@@ -811,12 +827,17 @@ proplist_to_card(Card) ->
 proplist_to_plan(Plan) ->
   DecodedResult = Plan,
   #stripe_plan{id = ?V(id),
+    amount = ?V(amount),
+    created = ?V(created),
     currency = check_to_atom(?V(currency)),
     interval = ?V(interval),
     interval_count = ?V(interval_count),
+    livemode = ?V(livemode),
+    metadata = ?V(metadata),
     name = ?V(name),
-    amount = ?V(amount),
-    livemode = ?V(livemode)}.
+    statement_descriptor = ?V(statement_descriptor),
+    trial_period_days = ?V(trial_period_days)
+  }.
 
 proplist_to_bank_account(null) -> null;
 proplist_to_bank_account(A) when is_binary(A) -> A;

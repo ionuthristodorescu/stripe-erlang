@@ -279,13 +279,16 @@ api_error,
 }).
 
 -record(stripe_plan, {id :: plan_id(),
-  currency :: currency(),
-  interval_count :: pos_integer(),
-  name :: binary(),
   amount :: amount(),
+  created :: epoch(),
+  currency :: currency(),
   interval :: binary(),
-  livemode :: boolean()
-}).
+  interval_count :: pos_integer(),
+  livemode :: boolean(),
+  metadata :: [key_value()],
+  name :: name(),
+  statement_descriptor :: desc(),
+  trial_period_days :: integer()}).
 
 -record(stripe_subscription, {id :: binary(),
   status :: atom(),
@@ -432,3 +435,4 @@ api_error,
   description :: desc(),
   recipient :: recipient_id(),
   statement_descriptor :: desc()}).
+
