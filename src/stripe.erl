@@ -21,7 +21,7 @@
 -export([get_all_customers/0, get_num_customers/1]).
 -export([customer_card_create/2, customer_card_delete/2, customer_card_update/11]).
 -export([account_bank_account_create/2, account_bank_account_delete/2]).
--export([plans_get/0]).
+-export([plans_get/0, plans_get_details/0]).
 
 -include("stripe.hrl").
 
@@ -39,6 +39,27 @@
 -spec plans_get() -> term().
 plans_get() ->
   request_plans().
+
+-spec plans_get_details() -> list().
+plans_get_details() ->
+  case plans_get() of
+    PlansList when is_record(PlansList, stripe_list) ->
+      F = fun
+        (Plan, AccIn) when is_record(Plan, stripe_plan) ->
+          AccIn ++ [plan_get_details(Plan)];
+        (SomeError, _) ->
+          SomeError
+      end,
+      Plans = PlansList#stripe_list.data,
+      {ok, lists:foldl(F, [], Plans)};
+    _ ->
+      error
+  end.
+
+-spec plan_get_details(#stripe_plan{}) -> list().
+plan_get_details(#stripe_plan{amount = Amount, currency = Currency, interval = Interval,
+    interval_count = IntervalCount, name = Name, trial_period_days = TrialPeriodDays}) ->
+  [Amount, atom_to_list(Currency), Interval, IntervalCount, Name, TrialPeriodDays].
 
 
 %%%--------------------------------------------------------------------
