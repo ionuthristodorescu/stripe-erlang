@@ -11,7 +11,7 @@
 -export([managed_account_charge_customer/6]).
 -export([charge_customer/4, charge_card/4]).
 -export([subscription_update/3, subscription_update/5,
-  subscription_update/6, subscription_cancel/2, subscription_cancel/3]).
+  subscription_update/6, subscription_cancel/2, subscription_cancel/3, subscription_get_details/1]).
 -export([customer/1, event/1, invoiceitem/1]).
 -export([recipient_create/6, recipient_update/6]).
 -export([transfer_create/5, transfer_cancel/1]).
@@ -61,6 +61,22 @@ plan_get_details(#stripe_plan{id = PlanId, amount = Amount, currency = Currency,
     interval_count = IntervalCount, name = Name, trial_period_days = TrialPeriodDays}) ->
   [PlanId, Amount, atom_to_list(Currency), Interval, IntervalCount, Name, TrialPeriodDays].
 
+-spec subscription_get_details(#stripe_customer{}) -> list().
+subscription_get_details(#stripe_customer{subscriptions = Subscriptions}) ->
+  case Subscriptions of
+    NoSubscriptions when NoSubscriptions == [] orelse NoSubscriptions == undefined -> [];
+    _ ->
+      F = fun(Subscription) ->
+        [Subscription#stripe_subscription.id, atom_to_list(Subscription#stripe_subscription.status),
+          Subscription#stripe_subscription.current_period_start, Subscription#stripe_subscription.current_period_end,
+          Subscription#stripe_subscription.trial_start, Subscription#stripe_subscription.trial_end,
+          Subscription#stripe_subscription.ended_at, Subscription#stripe_subscription.canceled_at,
+          Subscription#stripe_subscription.customer, Subscription#stripe_subscription.start,
+          Subscription#stripe_subscription.quantity] ++
+        plan_get_details(Subscription#stripe_subscription.plan)
+      end,
+      lists:map(F, Subscriptions)
+  end.
 
 %%%--------------------------------------------------------------------
 %%% Charging
