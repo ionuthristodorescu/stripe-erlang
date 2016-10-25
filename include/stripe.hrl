@@ -329,7 +329,8 @@ api_error,
   delinquent :: boolean(),
   discount :: #stripe_discount{},
   account_balance :: amount(),
-  sources :: [#stripe_bank_account{} | #stripe_card{}]
+  sources :: [#stripe_bank_account{} | #stripe_card{}],
+  subscriptions :: [#stripe_subscription{}]
 }).
 
 -record(stripe_verification, {fields_needed :: [desc()],

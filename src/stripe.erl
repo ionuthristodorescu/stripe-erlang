@@ -57,9 +57,9 @@ plans_get_details() ->
   end.
 
 -spec plan_get_details(#stripe_plan{}) -> list().
-plan_get_details(#stripe_plan{amount = Amount, currency = Currency, interval = Interval,
+plan_get_details(#stripe_plan{id = PlanId, amount = Amount, currency = Currency, interval = Interval,
     interval_count = IntervalCount, name = Name, trial_period_days = TrialPeriodDays}) ->
-  [Amount, atom_to_list(Currency), Interval, IntervalCount, Name, TrialPeriodDays].
+  [PlanId, Amount, atom_to_list(Currency), Interval, IntervalCount, Name, TrialPeriodDays].
 
 
 %%%--------------------------------------------------------------------
@@ -614,7 +614,8 @@ json_to_record(<<"customer">>, DecodedResult) ->
     delinquent = ?V(delinquent),
     discount = json_to_record(<<"discount">>, ?V(discount)),
     account_balance = ?V(account_balance),
-    sources = proplist_to_customer_sources(?V(sources))};
+    sources = proplist_to_customer_sources(?V(sources)),
+    subscriptions = (json_to_record(<<"list">>, ?V(subscriptions)))#stripe_list.data};
 
 % We don't have eunit tests for discount decoding yet.  Use at your own risk.
 json_to_record(<<"discount">>, null) -> null;
