@@ -116,24 +116,37 @@ charge(Amount, Currency, Params, Desc) when Amount > 50 ->
 %%% Account Creation
 %%%--------------------------------------------------------------------
 -spec account_create(account_type(), country(), email(), tuple(), string(), string(), string(), epoch(), string(), string()) -> term().
-account_create(AcctType, Country, Email, {Day, Month, Year}, FirstName, LastName, LegalEntityType, Date, IP, BusinessName) ->
-  DefaultFields = [{country, Country},
-    {email, Email},
-    {"legal_entity[dob][day]", Day},
-    {"legal_entity[dob][month]", Month},
-    {"legal_entity[dob][year]", Year},
-    {"legal_entity[first_name]", FirstName},
-    {"legal_entity[last_name]", LastName},
-    {"legal_entity[type]", LegalEntityType},
-    {"tos_acceptance[date]", Date},
-    {"tos_acceptance[ip]", IP},
-    {"legal_entity[business_name]", BusinessName}
-  ],
+account_create(AcctType, Country, Email, {Day, Month, Year}, FirstName, LastName,
+    LegalEntityType, Date, IP, BusinessName,
+    City, Country2LettersCode, AddressLine1, AddressLine2, ZIP, AddressState,
+    BusinessTaxId, SSNLast4) ->
+  DefaultFields =
+    [
+      {country, Country},
+      {email, Email}
+    ] ++
+    case Year of
+      Empty when Empty == [] orelse Empty == undefined orelse Empty == null -> [];
+      _ ->
+        [
+          {"legal_entity[dob][day]", Day},
+          {"legal_entity[dob][month]", Month},
+          {"legal_entity[dob][year]", Year}
+        ]
+    end ++
+    [
+      {"legal_entity[first_name]", FirstName},
+      {"legal_entity[last_name]", LastName},
+      {"legal_entity[type]", LegalEntityType},
+      {"tos_acceptance[date]", Date},
+      {"tos_acceptance[ip]", IP},
+      {"legal_entity[business_name]", BusinessName}
+    ],
   Fields = if
-             AcctType == managed -> DefaultFields ++ [{managed, true}];
-             AcctType == standalone -> DefaultFields;
-             true -> io:format("Error in account create, acct_type = ~p", [AcctType])
-           end,
+    AcctType == managed -> DefaultFields ++ [{managed, true}];
+    AcctType == standalone -> DefaultFields;
+    true -> io:format("Error in account create, acct_type = ~p", [AcctType])
+  end,
   request_account_create(Fields).
 
 %%%--------------------------------------------------------------------
