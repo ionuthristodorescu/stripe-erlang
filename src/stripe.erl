@@ -6,7 +6,7 @@
 -export([token_create/10, token_create_bank/3, token_get_id/1]).
 -export([customer_create/4, customer_get/1, customer_update/3, customer_get_id/1, customer_get_card_details/1,
   customer_update_subresource/3]).
--export([account_create/10, account_update/2, account_update_subresource/3, account_get/1,
+-export([account_create/18, account_update/2, account_update_subresource/3, account_get/1,
   account_get_id/1, account_get_email/1, account_get_bank_details/1]).%, customer_get/1, customer_update/3]).
 -export([managed_account_charge_customer/6]).
 -export([charge_customer/4, charge_card/4]).
@@ -115,7 +115,11 @@ charge(Amount, Currency, Params, Desc) when Amount > 50 ->
 %%%--------------------------------------------------------------------
 %%% Account Creation
 %%%--------------------------------------------------------------------
--spec account_create(account_type(), country(), email(), tuple(), string(), string(), string(), epoch(), string(), string()) -> term().
+-spec account_create(account_type(), country(), email(), tuple(),
+    string(), string(),
+    string(), epoch(), string(), string(),
+    string(), string(), string(), string(), string(), string(),
+    string(), string()) -> term().
 account_create(AcctType, Country, Email, {Day, Month, Year}, FirstName, LastName,
     LegalEntityType, Date, IP, BusinessName,
     City, Country2LettersCode, AddressLine1, AddressLine2, ZIP, AddressState,
@@ -141,7 +145,28 @@ account_create(AcctType, Country, Email, {Day, Month, Year}, FirstName, LastName
       {"tos_acceptance[date]", Date},
       {"tos_acceptance[ip]", IP},
       {"legal_entity[business_name]", BusinessName}
-    ],
+    ] ++
+    case Country2LettersCode of
+      Empty when Empty == [] orelse Empty == undefined orelse Empty == null -> [];
+      _ ->
+        [
+          {"legal_entity[address][city]", City},
+          {"legal_entity[address][country]", Country2LettersCode},
+          {"legal_entity[address][line1]", AddressLine1},
+          {"legal_entity[address][line2]", AddressLine2},
+          {"legal_entity[address][postal_code]", ZIP},
+          {"legal_entity[address][state]", AddressState}
+        ]
+    end ++
+    case BusinessTaxId of
+      Empty when Empty == [] orelse Empty == undefined orelse Empty == null -> [];
+      _ -> [{"legal_entity[business_tax_id]", BusinessTaxId}]
+    end ++
+    case SSNLast4 of
+      Empty when Empty == [] orelse Empty == undefined orelse Empty == null -> [];
+      _ -> [{"legat_entity[ssn_last_4]", SSNLast4}]
+    end,
+
   Fields = if
     AcctType == managed -> DefaultFields ++ [{managed, true}];
     AcctType == standalone -> DefaultFields;
