@@ -8,7 +8,7 @@
   customer_update_subresource/3]).
 -export([account_create/18, account_update/2, account_update_subresource/3, account_get/1,
   account_get_id/1, account_get_email/1, account_get_bank_details/1]).%, customer_get/1, customer_update/3]).
--export([managed_account_charge_customer/6]).
+-export([managed_account_charge_customer/7]).
 -export([charge_customer/4, charge_card/4]).
 -export([subscription_update/3, subscription_update/5,
   subscription_update/6, subscription_cancel/2, subscription_cancel/3, subscription_get_details/1]).
@@ -85,13 +85,19 @@ subscription_get_details(#stripe_customer{subscriptions = Subscriptions}) ->
 charge_customer(Amount, Currency, Customer, Desc) ->
   charge(Amount, Currency, [{customer, Customer}], Desc).
 
--spec managed_account_charge_customer(price(), currency(), customer_id(), account_id(), desc(), binary()) -> term().
-managed_account_charge_customer(Amount, Currency, CustomerSrc, AccountDest, Desc, CardId) ->
+-spec managed_account_charge_customer(price(), currency(), customer_id(),
+    account_id(), desc(), binary(), integer()) -> term().
+managed_account_charge_customer(Amount, Currency, CustomerSrc, AccountDest, Desc, CardId, ApplicationFeeCents) ->
   charge(Amount, Currency,
     case is_binary(CustomerSrc) of
       true -> [{customer, CustomerSrc}];
       _ -> []
     end ++ [{destination, AccountDest}] ++
+    case ApplicationFeeCents of
+      null -> [];
+      undefined -> [];
+      _ -> [{application_fee, ApplicationFeeCents}]
+    end ++
     case is_binary(CardId) of
       true -> [{source, CardId}];
       _ -> []
