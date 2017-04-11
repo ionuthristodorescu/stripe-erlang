@@ -8,7 +8,7 @@
   customer_update_subresource/3]).
 -export([account_create/18, account_update/2, account_update_subresource/3, account_get/1,
   account_get_id/1, account_get_email/1, account_get_bank_details/1]).%, customer_get/1, customer_update/3]).
--export([managed_account_charge_customer/7, capture_charge/5]).
+-export([managed_account_charge_customer/8, capture_charge/5]).
 -export([charge_customer/4, charge_card/4]).
 -export([subscription_update/3, subscription_update/5,
   subscription_update/6, subscription_cancel/2, subscription_cancel/3, subscription_get_details/1]).
