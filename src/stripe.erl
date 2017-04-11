@@ -108,7 +108,7 @@ managed_account_charge_customer(Amount, Currency, CustomerSrc, AccountDest, Desc
 
 -spec capture_charge(charge_id(), pos_integer(), pos_integer(), email(), desc()) -> term().
 capture_charge(ChargeId, Amount, ApplicationFeeCents, ReceiptEmail, StatementDesc) ->
-  Fields = [{amount, Amount}, {application_fee, ApplicationFee}] ++
+  Fields = [{amount, Amount}, {application_fee, ApplicationFeeCents}] ++
     case ReceiptEmail of 
       undefined -> [];
       RE -> [{receipt_email, ReceiptEmail}]
