@@ -256,6 +256,7 @@ api_error,
   account :: binary()}).
 
 -record(stripe_charge, {id :: charge_id(),
+  captured :: boolean(),
   created :: epoch(),
   amount :: price(),
   balance_transaction :: balance_txn(),

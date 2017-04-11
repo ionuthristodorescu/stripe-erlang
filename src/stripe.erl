@@ -8,7 +8,7 @@
   customer_update_subresource/3]).
 -export([account_create/18, account_update/2, account_update_subresource/3, account_get/1,
   account_get_id/1, account_get_email/1, account_get_bank_details/1]).%, customer_get/1, customer_update/3]).
--export([managed_account_charge_customer/7]).
+-export([managed_account_charge_customer/7, capture_charge/5]).
 -export([charge_customer/4, charge_card/4]).
 -export([subscription_update/3, subscription_update/5,
   subscription_update/6, subscription_cancel/2, subscription_cancel/3, subscription_get_details/1]).
@@ -86,23 +86,39 @@ charge_customer(Amount, Currency, Customer, Desc) ->
   charge(Amount, Currency, [{customer, Customer}], Desc).
 
 -spec managed_account_charge_customer(price(), currency(), customer_id(),
-    account_id(), desc(), binary(), integer()) -> term().
-managed_account_charge_customer(Amount, Currency, CustomerSrc, AccountDest, Desc, CardId, ApplicationFeeCents) ->
+    account_id(), desc(), binary(), integer(), boolean()) -> term().
+managed_account_charge_customer(Amount, Currency, CustomerSrc, AccountDest, Desc, CardId, ApplicationFeeCents, CaptureFlag) ->
   charge(Amount, Currency,
-    case is_binary(CustomerSrc) of
+    case is_binary(CustomerSrc) andalso CustomerSrc /= <<>> andalso CustomerSrc /= <<"">> of
       true -> [{customer, CustomerSrc}];
       _ -> []
-    end ++ [{destination, AccountDest}] ++
+    end ++
+    [{destination, AccountDest}] ++
     case ApplicationFeeCents of
       null -> [];
       undefined -> [];
       _ -> [{application_fee, ApplicationFeeCents}]
     end ++
-    case is_binary(CardId) of
+    case is_binary(CardId) andalso CustomerSrc /= <<>> andalso CustomerSrc /= <<"">> of
       true -> [{source, CardId}];
       _ -> []
-    end,
+    end ++
+    [{capture, CaptureFlag}],
     Desc).
+
+-spec capture_charge(charge_id(), pos_integer(), pos_integer(), email(), desc()) -> term().
+capture_charge(ChargeId, Amount, ApplicationFeeCents, ReceiptEmail, StatementDesc) ->
+  Fields = [{amount, Amount}, {application_fee, ApplicationFee}] ++
+    case ReceiptEmail of 
+      undefined -> [];
+      RE -> [{receipt_email, ReceiptEmail}]
+    end ++ 
+    case StatementDesc of 
+      undefined -> [];
+      SD -> [{statement_descriptor, StatementDesc}]
+    end  
+  ],
+  request_run(gen_charge_subresource_url(ChargeId, capture), post, Fields). 
 
 -spec charge_card(price(), currency(), token_id(), desc()) -> term().
 charge_card(Amount, Currency, Card, Desc) ->
@@ -112,8 +128,7 @@ charge_card(Amount, Currency, Card, Desc) ->
     %{customer, customer_id()} | {card, token_id()}, {} | {destination, account_id()},
     list(), desc()) -> term().
 charge(Amount, Currency, Params, Desc) when Amount > 50 ->
-  Fields = [{amount, Amount},
-    {currency, Currency}] ++
+  Fields = [{amount, Amount}, {currency, Currency}] ++
     Params ++
     [{description, Desc}],
   request_charge(Fields).
@@ -1038,7 +1053,7 @@ gen_account_url(AccountId) when is_list(AccountId) ->
   "https://api.stripe.com/v1/accounts/" ++ AccountId.
 
 gen_account_subresource_url(AccountId, Resource) when is_binary(AccountId) orelse
-  is_binary(Resource) ->
+    is_binary(Resource) ->
   AccountIdList = if
                     is_binary(AccountId) -> binary_to_list(AccountId);
                     true -> AccountId
@@ -1049,11 +1064,11 @@ gen_account_subresource_url(AccountId, Resource) when is_binary(AccountId) orels
                  end,
   gen_account_subresource_url(AccountIdList, ResourceList);
 gen_account_subresource_url(AccountId, Resource) when is_list(AccountId) and
-  is_list(Resource) ->
-  "https://api.stripe.com/v1/accounts/" ++ AccountId ++ "/" ++ Resource.
+    is_list(Resource) ->
+  gen_account_url(AccountId) ++ "/" ++ Resource.
 
 gen_customer_subresource_url(CustomerId, Resource) when is_binary(CustomerId) orelse
-  is_binary(Resource) ->
+    is_binary(Resource) ->
   CustomerIdList =
     if
       is_binary(CustomerId) -> binary_to_list(CustomerId);
@@ -1064,9 +1079,11 @@ gen_customer_subresource_url(CustomerId, Resource) when is_binary(CustomerId) or
       true -> Resource end,
   gen_customer_subresource_url(CustomerIdList, ResourceList);
 gen_customer_subresource_url(CustomerId, Resource) when is_list(CustomerId) and
-  is_list(Resource) ->
-  "https://api.stripe.com/v1/customers/" ++ CustomerId ++ "/" ++ Resource.
+    is_list(Resource) ->
+  gen_customer_url(CustomerId) ++ "/" ++ Resource.
 
+gen_charge_subresource_url(ChargeId, SubResource) ->
+  gen_url(chanrges) ++ "/" ++ ChargeId ++ atom_to_list(SubResource).
 
 gen_customer_url(CustomerId) when is_binary(CustomerId) ->
   gen_customer_url(binary_to_list(CustomerId));
