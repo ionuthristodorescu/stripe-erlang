@@ -111,11 +111,11 @@ capture_charge(ChargeId, Amount, ApplicationFeeCents, ReceiptEmail, StatementDes
   Fields = [{amount, Amount}, {application_fee, ApplicationFeeCents}] ++
     case ReceiptEmail of 
       undefined -> [];
-      RE -> [{receipt_email, ReceiptEmail}]
+      _ -> [{receipt_email, ReceiptEmail}]
     end ++ 
     case StatementDesc of 
       undefined -> [];
-      SD -> [{statement_descriptor, StatementDesc}]
+      _ -> [{statement_descriptor, StatementDesc}]
     end,
   request_run(gen_charge_subresource_url(ChargeId, capture), post, Fields). 
 
