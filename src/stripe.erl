@@ -116,8 +116,7 @@ capture_charge(ChargeId, Amount, ApplicationFeeCents, ReceiptEmail, StatementDes
     case StatementDesc of 
       undefined -> [];
       SD -> [{statement_descriptor, StatementDesc}]
-    end  
-  ],
+    end,
   request_run(gen_charge_subresource_url(ChargeId, capture), post, Fields). 
 
 -spec charge_card(price(), currency(), token_id(), desc()) -> term().
