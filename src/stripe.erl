@@ -12,7 +12,7 @@
 -export([charge_customer/4, charge_card/4]).
 -export([subscription_update/3, subscription_update/5,
   subscription_update/6, subscription_cancel/2, subscription_cancel/3, subscription_get_details/1]).
--export([customer/1, event/1, invoiceitem/1]).
+-export([customer/1, event/1, invoiceitem/1, charge_get/1, charge_capture_flag_get/1]).
 -export([recipient_create/6, recipient_update/6]).
 -export([transfer_create/5, transfer_cancel/1]).
 -export([invoiceitem_create/4]).
@@ -292,6 +292,14 @@ customer_card_update(CardId, CustomerId, AddrLine1, AddrLine2, City, Zip, State,
 -spec customer_get(customer_id()) -> term().
 customer_get(CustomerId) ->
   request_customer(CustomerId).
+
+-spec charge_get(charge_id()) -> term().  
+charge_get(ChargeId) ->
+  request_run(gen_charge_url(ChargeId), get, []).
+
+-spec charge_capture_flag_get(#stripe_charge{}) -> boolean().
+charge_capture_flag_get(Charge) ->
+  Charge#stripe_charge.captured.
 
 -spec customer_get_id(#stripe_customer{}) -> customer_id().
 customer_get_id(StripeCustomer) ->
@@ -659,6 +667,7 @@ json_to_record(<<"event">>, DecodedResult) ->
 
 json_to_record(<<"charge">>, DecodedResult) ->
   #stripe_charge{id = ?V(id),
+    captured = ?V(captured),
     created = ?V(created),
     amount = ?V(amount),
     balance_transaction = ?V(balance_transaction),
@@ -1088,6 +1097,11 @@ gen_customer_url(CustomerId) when is_binary(CustomerId) ->
   gen_customer_url(binary_to_list(CustomerId));
 gen_customer_url(CustomerId) when is_list(CustomerId) ->
   "https://api.stripe.com/v1/customers/" ++ CustomerId.
+
+gen_charge_url(ChargeId) when is_binary(ChargeId) ->
+  gen_charge_url(binary_to_list(ChargeId));
+gen_charge_url(ChargeId) when is_list(ChargeId) ->
+  "https://api.stripe.com/v1/charges/" ++ ChargeId.
 
 gen_recipient_url(RecipientId) when is_binary(RecipientId) ->
   gen_recipient_url(binary_to_list(RecipientId));
