@@ -58,8 +58,8 @@ plans_get_details() ->
 
 -spec plan_get_details(#stripe_plan{}) -> list().
 plan_get_details(#stripe_plan{id = PlanId, amount = Amount, currency = Currency, interval = Interval,
-    interval_count = IntervalCount, name = Name, trial_period_days = TrialPeriodDays}) ->
-  [PlanId, Amount, atom_to_list(Currency), Interval, IntervalCount, Name, TrialPeriodDays].
+    interval_count = IntervalCount, name = Name, trial_period_days = TrialPeriodDays, metadata = Metadata}) ->
+  [PlanId, Amount, atom_to_list(Currency), Interval, IntervalCount, Name, TrialPeriodDays, Metadata].
 
 -spec subscription_get_details(#stripe_customer{}) -> list().
 subscription_get_details(#stripe_customer{subscriptions = Subscriptions}) ->
